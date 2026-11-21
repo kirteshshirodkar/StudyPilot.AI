@@ -1,5 +1,5 @@
 
-import { PrismaClient } from "@prisma/client/extension";
+import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
 
 const connectionString = process.env.DATABASE_URL;
