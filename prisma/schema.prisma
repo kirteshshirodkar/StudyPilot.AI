@@ -1,0 +1,42 @@
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  name      String?
+  email     String   @unique
+  imageUrl  String?
+
+  profile   StudentProfile?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StudentProfile {
+  id                  String   @id @default(cuid())
+
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  academicLevel       String?
+  institution         String?
+  course              String?
+
+  dailyStudyHours     Int?
+  preferredStudyTime  String?
+  studyGoal           String?
+
+  onboardingCompleted Boolean  @default(false)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
