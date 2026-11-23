@@ -1,8 +1,14 @@
+
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8f7ff;
+  --foreground: #24213a;
+  --primary: #8967e8;
+  --primary-dark: #704bd0;
+  --muted: #85819b;
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.85);
 }
 
 @theme inline {
@@ -12,15 +18,64 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
+  min-height: 100vh;
+  margin: 0;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background:
+    radial-gradient(ellipse at 5% 5%, rgba(196, 176, 255, 0.25), transparent 35%),
+    radial-gradient(ellipse at 95% 15%, rgba(164, 231, 242, 0.23), transparent 32%),
+    radial-gradient(ellipse at 75% 95%, rgba(255, 211, 191, 0.2), transparent 30%),
+    var(--background);
+  font-family: var(--font-geist-sans), sans-serif;;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.glass-panel {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow:
+    0 8px 32px rgba(91, 76, 145, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.glass-sidebar {
+  background: rgba(255, 255, 255, 0.66);
+  border-right: 1px solid rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.ambient-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(65px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.gradient-text {
+  background: linear-gradient(110deg, #8967e8, #c078d8, #e99d9c);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+::selection {
+  background: rgba(137, 103, 232, 0.2);
 }
