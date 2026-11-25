@@ -27,5 +27,12 @@ export default async function DashboardLayout({
     redirect("/onboarding");
   }
 
-  return <DashboardShell>{children}</DashboardShell>;
+  return (
+    <DashboardShell
+      userName={user.name ?? "Student"}
+      userImage={user.imageUrl}
+    >
+      {children}
+    </DashboardShell>
+  );
 }

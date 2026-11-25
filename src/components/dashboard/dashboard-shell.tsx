@@ -1,9 +1,10 @@
-
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useClerk } from "@clerk/nextjs";
+import Image from "next/image";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -20,6 +21,8 @@ import {
   Search,
   ChevronDown,
   Plus,
+  UserRound,
+  LogOut,
 } from "lucide-react";
 
 const navigation = [
@@ -32,13 +35,63 @@ const navigation = [
   { label: "Deadlines", href: "/deadlines", icon: Flag },
 ];
 
+type DashboardShellProps = {
+  children: React.ReactNode;
+  userName: string;
+  userImage: string | null;
+};
+
 export default function DashboardShell({
   children,
-}: {
-  children: React.ReactNode;
-}) {
+  userName,
+  userImage,
+}: DashboardShellProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { openUserProfile, signOut } = useClerk();
+
+  const [activeAccountMenu, setActiveAccountMenu] = useState<
+    "sidebar" | "topbar" | null
+  >(null);
+  const sidebarAccountRef = useRef<HTMLDivElement>(null);
+  const topbarAccountRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+
+      if (
+        !sidebarAccountRef.current?.contains(target) &&
+        !topbarAccountRef.current?.contains(target)
+      ) {
+        setActiveAccountMenu(null);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setActiveAccountMenu(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  const handleManageAccount = () => {
+    setActiveAccountMenu(null);
+    openUserProfile();
+  };
+
+  const handleSignOut = async () => {
+    setActiveAccountMenu(null);
+    await signOut({ redirectUrl: "/sign-in" });
+  };
 
   return (
     <div className="min-h-screen text-[#292540]">
@@ -107,9 +160,13 @@ export default function DashboardShell({
                 <Icon size={19} />
                 {item.label}
                 {item.label === "AI Study Buddy" && (
-                  <span className={`ml-auto rounded-md px-1.5 py-0.5 text-[9px] ${
-                    active ? "bg-white/20 text-white" : "bg-purple-100 text-purple-600"
-                  }`}>
+                  <span
+                    className={`ml-auto rounded-md px-1.5 py-0.5 text-[9px] ${
+                      active
+                        ? "bg-white/20 text-white"
+                        : "bg-purple-100 text-purple-600"
+                    }`}
+                  >
                     AI
                   </span>
                 )}
@@ -143,15 +200,46 @@ export default function DashboardShell({
             Settings
           </Link>
 
-          <div className="mt-3 flex items-center gap-3 border-t border-purple-100/80 pt-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#f6c9db] to-[#d9c5ff] text-sm font-bold text-[#6546a5]">
-              S
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold">Student</p>
-              <p className="text-xs text-[#9993aa]">StudyPilot member</p>
-            </div>
-            <ChevronDown size={17} className="text-[#9993aa]" />
+          <div
+            ref={sidebarAccountRef}
+            className="relative mt-3 border-t border-purple-100/80 pt-4"
+          >
+            <button
+              type="button"
+              onClick={() =>
+                setActiveAccountMenu((current) =>
+                  current === "sidebar" ? null : "sidebar",
+                )
+              }
+              aria-expanded={activeAccountMenu === "sidebar"}
+              aria-haspopup="menu"
+              className="flex w-full items-center gap-3 rounded-2xl p-2 text-left transition hover:bg-white/80"
+            >
+              <UserAvatar userName={userName} userImage={userImage} />
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-[#29243b]">
+                  {userName}
+                </p>
+                <p className="text-xs text-[#9993aa]">StudyPilot member</p>
+              </div>
+
+              <ChevronDown
+                size={17}
+                className={`text-[#9993aa] transition-transform ${
+                  activeAccountMenu === "sidebar" ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {activeAccountMenu === "sidebar" && (
+              <AccountDropdown
+                userName={userName}
+                userImage={userImage}
+                onManageAccount={handleManageAccount}
+                onSignOut={handleSignOut}
+              />
+            )}
           </div>
         </div>
       </aside>
@@ -198,16 +286,134 @@ export default function DashboardShell({
               <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#f39b9b] ring-2 ring-white" />
             </button>
 
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#c7b5ff] to-[#f7c8d9] text-sm font-bold text-[#6546a5]">
-              S
+            <div ref={topbarAccountRef} className="relative">
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveAccountMenu((current) =>
+                    current === "topbar" ? null : "topbar",
+                  )
+                }
+                aria-expanded={activeAccountMenu === "topbar"}
+                aria-haspopup="menu"
+                aria-label="Open account menu"
+                className="flex items-center gap-2 rounded-full p-1 transition hover:bg-purple-50"
+              >
+                <UserAvatar
+                  userName={userName}
+                  userImage={userImage}
+                  size="md"
+                />
+
+                <ChevronDown
+                  size={15}
+                  className={`hidden text-[#9993aa] transition-transform sm:block ${
+                    activeAccountMenu === "topbar" ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {activeAccountMenu === "topbar" && (
+                <div className="absolute right-0 top-full z-[70] mt-3 w-64">
+                  <AccountDropdown
+                    userName={userName}
+                    userImage={userImage}
+                    placement="below"
+                    onManageAccount={handleManageAccount}
+                    onSignOut={handleSignOut}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </header>
 
-        <div className="p-4 sm:p-6 lg:p-8">
-          {children}
-        </div>
+        <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </main>
+    </div>
+  );
+}
+
+function UserAvatar({
+  userName,
+  userImage,
+  size = "md",
+}: {
+  userName: string;
+  userImage: string | null;
+  size?: "sm" | "md";
+}) {
+  const dimensions = size === "sm" ? "h-9 w-9 text-xs" : "h-10 w-10 text-sm";
+
+  return (
+    <div
+      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[#a58af5] to-[#7955dc] font-bold text-white shadow-md ${dimensions}`}
+    >
+      {userImage ? (
+        <Image
+          src={userImage}
+          alt={`${userName}'s profile`}
+          fill
+          unoptimized
+          sizes={size === "sm" ? "36px" : "40px"}
+          className="object-cover"
+        />
+      ) : (
+        userName.trim().charAt(0).toUpperCase() || "S"
+      )}
+    </div>
+  );
+}
+
+function AccountDropdown({
+  userName,
+  userImage,
+  onManageAccount,
+  onSignOut,
+  placement = "above",
+}: {
+  userName: string;
+  userImage: string | null;
+  onManageAccount: () => void;
+  onSignOut: () => void;
+  placement?: "above" | "below";
+}) {
+  return (
+    <div
+      className={`absolute right-0 z-[70] w-64 overflow-hidden rounded-2xl border border-white/80 bg-white/95 p-2 shadow-2xl shadow-purple-200/50 backdrop-blur-2xl ${
+        placement === "above" ? "bottom-full mb-3" : "top-full mt-3"
+      }`}
+    >
+      <div className="flex items-center gap-3 rounded-xl bg-gradient-to-br from-[#f4efff] to-[#eefaff] p-3">
+        <UserAvatar userName={userName} userImage={userImage} size="md" />
+
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-[#29243b]">
+            {userName}
+          </p>
+          <p className="text-xs text-[#9993aa]">StudyPilot member</p>
+        </div>
+      </div>
+
+      <div className="my-2 h-px bg-purple-100" />
+
+      <button
+        type="button"
+        onClick={onManageAccount}
+        className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-[#77728e] transition hover:bg-purple-50 hover:text-[#805cda]"
+      >
+        <UserRound size={17} />
+        Manage account
+      </button>
+
+      <button
+        type="button"
+        onClick={onSignOut}
+        className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-rose-500 transition hover:bg-rose-50"
+      >
+        <LogOut size={17} />
+        Sign out
+      </button>
     </div>
   );
 }
