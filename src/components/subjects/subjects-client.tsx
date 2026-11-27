@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useMemo, useState } from "react";
@@ -12,6 +11,8 @@ import {
   X,
   Loader2,
   AlertCircle,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 type Subject = {
@@ -54,6 +55,10 @@ export default function SubjectsClient({
   const [color, setColor] = useState(SUBJECT_COLORS[0]);
   const [targetHours, setTargetHours] = useState("5");
 
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+  const [deletingSubject, setDeletingSubject] = useState<Subject | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const totalSubjects = subjects.length;
 
   const totalTargetHours = subjects.reduce(
@@ -90,12 +95,56 @@ export default function SubjectsClient({
     if (isSaving) return;
 
     setIsModalOpen(false);
+    setEditingSubject(null);
     resetForm();
   }
 
-  async function handleAddSubject(
-    event: React.FormEvent<HTMLFormElement>,
-  ) {
+  function openEditModal(subject: Subject) {
+    setEditingSubject(subject);
+
+    setName(subject.name);
+    setDescription(subject.description ?? "");
+    setColor(subject.color);
+    setTargetHours(String(subject.targetHoursPerWeek ?? 5));
+
+    setError("");
+    setIsModalOpen(true);
+  }
+
+  async function handleDeleteSubject() {
+    if (!deletingSubject) return;
+
+    setIsDeleting(true);
+
+    try {
+      const response = await fetch(`/api/subjects/${deletingSubject.id}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error || data.message || "Failed to delete subject.",
+        );
+      }
+
+      setSubjects((current) =>
+        current.filter((subject) => subject.id !== deletingSubject.id),
+      );
+
+      setDeletingSubject(null);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to delete subject.",
+      );
+      setDeletingSubject(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  async function handleSaveSubject(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
 
@@ -108,56 +157,67 @@ export default function SubjectsClient({
 
     const hours = Number(targetHours);
 
-    if (
-      !Number.isFinite(hours) ||
-      hours < 0 ||
-      hours > 168
-    ) {
+    if (!Number.isFinite(hours) || hours < 0 || hours > 168) {
       setError("Enter a valid weekly target between 0 and 168 hours.");
       return;
     }
 
     setIsSaving(true);
 
+    const isEditing = Boolean(editingSubject);
+
     try {
-      const response = await fetch("/api/subjects", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        isEditing ? `/api/subjects/${editingSubject!.id}` : "/api/subjects",
+        {
+          method: isEditing ? "PATCH" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: trimmedName,
+            description: description.trim() || undefined,
+            color,
+            targetHoursPerWeek: hours,
+          }),
         },
-        body: JSON.stringify({
-          name: trimmedName,
-          description: description.trim() || undefined,
-          color,
-          targetHoursPerWeek: hours,
-        }),
-      });
+      );
 
       const data = await response.json();
 
       if (!response.ok || !data.success) {
         throw new Error(
-          data.error || data.message || "Failed to create subject.",
+          data.error || data.message || "Failed to save subject.",
         );
       }
 
-      const createdSubject = data.subject;
+      const savedSubject = data.subject;
 
-      const newSubject: Subject = {
-        id: createdSubject.id,
-        name: createdSubject.name,
-        description: createdSubject.description ?? null,
-        color: createdSubject.color,
-        targetHoursPerWeek:
-          createdSubject.targetHoursPerWeek ?? null,
-        topicCount: createdSubject._count?.topics ?? 0,
-        createdAt: createdSubject.createdAt
-          ? new Date(createdSubject.createdAt).toISOString()
-          : new Date().toISOString(),
+      const updatedSubject: Subject = {
+        id: savedSubject.id,
+        name: savedSubject.name,
+        description: savedSubject.description ?? null,
+        color: savedSubject.color,
+        targetHoursPerWeek: savedSubject.targetHoursPerWeek ?? null,
+        topicCount:
+          savedSubject._count?.topics ?? editingSubject?.topicCount ?? 0,
+        createdAt: savedSubject.createdAt
+          ? new Date(savedSubject.createdAt).toISOString()
+          : (editingSubject?.createdAt ?? new Date().toISOString()),
       };
 
-      setSubjects((current) => [newSubject, ...current]);
+      if (isEditing) {
+        setSubjects((current) =>
+          current.map((subject) =>
+            subject.id === updatedSubject.id ? updatedSubject : subject,
+          ),
+        );
+      } else {
+        setSubjects((current) => [updatedSubject, ...current]);
+      }
+
       setIsModalOpen(false);
+      setEditingSubject(null);
       resetForm();
     } catch (err) {
       setError(
@@ -263,21 +323,24 @@ export default function SubjectsClient({
         {filteredSubjects.length > 0 ? (
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
             {filteredSubjects.map((subject) => (
-              <SubjectCard key={subject.id} subject={subject} />
+              <SubjectCard
+                key={subject.id}
+                subject={subject}
+                onEdit={openEditModal}
+                onDelete={setDeletingSubject}
+              />
             ))}
           </div>
         ) : (
           <div className="rounded-3xl border border-purple-100/80 bg-white/65 px-6 py-14 text-center shadow-sm backdrop-blur-xl">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-purple-100 text-purple-600">
-              {search ? (
-                <Search size={27} />
-              ) : (
-                <BookOpen size={27} />
-              )}
+              {search ? <Search size={27} /> : <BookOpen size={27} />}
             </div>
 
             <h3 className="text-lg font-bold text-[#29243b]">
-              {search ? "No subjects found" : "Your learning journey starts here"}
+              {search
+                ? "No subjects found"
+                : "Your learning journey starts here"}
             </h3>
 
             <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#9993aa]">
@@ -314,10 +377,13 @@ export default function SubjectsClient({
                   <BookOpen size={22} />
                 </div>
                 <h2 className="text-2xl font-bold text-[#29243b]">
-                  Add a Subject
+                  {editingSubject ? "Edit Subject" : "Add a Subject"}
                 </h2>
+
                 <p className="mt-1 text-sm text-[#9993aa]">
-                  Create a space for your next learning goal.
+                  {editingSubject
+                    ? "Update your subject details and study goals."
+                    : "Create a space for your next learning goal."}
                 </p>
               </div>
 
@@ -332,7 +398,7 @@ export default function SubjectsClient({
               </button>
             </div>
 
-            <form onSubmit={handleAddSubject} className="space-y-5">
+            <form onSubmit={handleSaveSubject} className="space-y-5">
               {/* Subject name */}
               <div>
                 <label
@@ -424,9 +490,7 @@ export default function SubjectsClient({
                     max="168"
                     step="0.5"
                     value={targetHours}
-                    onChange={(event) =>
-                      setTargetHours(event.target.value)
-                    }
+                    onChange={(event) => setTargetHours(event.target.value)}
                     className="w-full rounded-xl border border-purple-100 bg-purple-50/40 py-3 pl-11 pr-14 text-sm text-[#29243b] outline-none transition focus:border-purple-300 focus:ring-4 focus:ring-purple-100/70"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-[#9993aa]">
@@ -462,17 +526,72 @@ export default function SubjectsClient({
                   {isSaving ? (
                     <>
                       <Loader2 size={17} className="animate-spin" />
-                      Creating...
+                      Saving...
                     </>
                   ) : (
                     <>
-                      <Plus size={17} />
-                      Create Subject
+                      {editingSubject ? (
+                        <Pencil size={17} />
+                      ) : (
+                        <Plus size={17} />
+                      )}
+                      {editingSubject ? "Save Changes" : "Create Subject"}
                     </>
                   )}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {deletingSubject && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#211936]/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-white/70 bg-white/95 p-7 shadow-2xl shadow-purple-950/20">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-500">
+              <Trash2 size={23} />
+            </div>
+
+            <h2 className="text-xl font-bold text-[#29243b]">
+              Delete Subject?
+            </h2>
+
+            <p className="mt-3 text-sm leading-6 text-[#9993aa]">
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-[#49425d]">
+                {deletingSubject.name}
+              </span>
+              ? This action cannot be undone.
+            </p>
+
+            <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeletingSubject(null)}
+                className="rounded-xl border border-purple-100 px-5 py-3 text-sm font-semibold text-[#777087] transition hover:bg-purple-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleDeleteSubject}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-600 disabled:opacity-60"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={17} className="animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={17} />
+                    Delete Subject
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -517,7 +636,15 @@ function StatCard({
 }
 
 /* Subject card */
-function SubjectCard({ subject }: { subject: Subject }) {
+function SubjectCard({
+  subject,
+  onEdit,
+  onDelete,
+}: {
+  subject: Subject;
+  onEdit: (subject: Subject) => void;
+  onDelete: (subject: Subject) => void;
+}) {
   return (
     <div className="group relative overflow-hidden rounded-3xl border border-white/80 bg-white/75 p-5 shadow-[0_8px_30px_rgba(112,82,170,0.06)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-purple-100/70">
       <div
@@ -567,14 +694,12 @@ function SubjectCard({ subject }: { subject: Subject }) {
           </div>
           <p className="mt-1 text-lg font-bold text-[#49425d]">
             {subject.targetHoursPerWeek ?? 0}
-            <span className="ml-1 text-xs font-medium text-[#9993aa]">
-              hrs
-            </span>
+            <span className="ml-1 text-xs font-medium text-[#9993aa]">hrs</span>
           </p>
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between border-t border-purple-100/70 pt-4">
         <span className="text-xs text-[#aaa3ba]">
           Added{" "}
           {new Date(subject.createdAt).toLocaleDateString("en-IN", {
@@ -584,10 +709,27 @@ function SubjectCard({ subject }: { subject: Subject }) {
           })}
         </span>
 
-        <span className="flex items-center gap-1 text-xs font-semibold text-purple-600 transition group-hover:gap-2">
-          View subject
-          <span aria-hidden="true">→</span>
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onEdit(subject)}
+            aria-label={`Edit ${subject.name}`}
+            title="Edit subject"
+            className="rounded-xl bg-purple-50 p-2 text-purple-600 transition hover:bg-purple-100"
+          >
+            <Pencil size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onDelete(subject)}
+            aria-label={`Delete ${subject.name}`}
+            title="Delete subject"
+            className="rounded-xl bg-red-50 p-2 text-red-500 transition hover:bg-red-100"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
       </div>
     </div>
   );
