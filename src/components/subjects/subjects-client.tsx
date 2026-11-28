@@ -1,5 +1,5 @@
 "use client";
-
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   BookOpen,
@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Pencil,
   Trash2,
+  ArrowRight,
 } from "lucide-react";
 
 type Subject = {
@@ -636,6 +637,7 @@ function StatCard({
 }
 
 /* Subject card */
+
 function SubjectCard({
   subject,
   onEdit,
@@ -694,12 +696,14 @@ function SubjectCard({
           </div>
           <p className="mt-1 text-lg font-bold text-[#49425d]">
             {subject.targetHoursPerWeek ?? 0}
-            <span className="ml-1 text-xs font-medium text-[#9993aa]">hrs</span>
+            <span className="ml-1 text-xs font-medium text-[#9993aa]">
+              hrs
+            </span>
           </p>
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between border-t border-purple-100/70 pt-4">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-purple-100/70 pt-4">
         <span className="text-xs text-[#aaa3ba]">
           Added{" "}
           {new Date(subject.createdAt).toLocaleDateString("en-IN", {
@@ -710,6 +714,16 @@ function SubjectCard({
         </span>
 
         <div className="flex items-center gap-2">
+          {/* Open Subject */}
+          <Link
+            href={`/subjects/${subject.id}`}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-3 py-2 text-xs font-semibold text-white shadow-sm shadow-purple-200 transition hover:bg-purple-700"
+          >
+            Open
+            <ArrowRight size={14} />
+          </Link>
+
+          {/* Edit */}
           <button
             type="button"
             onClick={() => onEdit(subject)}
@@ -720,6 +734,7 @@ function SubjectCard({
             <Pencil size={16} />
           </button>
 
+          {/* Delete */}
           <button
             type="button"
             onClick={() => onDelete(subject)}
